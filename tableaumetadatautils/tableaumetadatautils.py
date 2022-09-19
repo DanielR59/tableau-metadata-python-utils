@@ -67,7 +67,7 @@ class myTableauApi:
             "Content-Type": "application/xml",
         }
 
-        payload = f"""<tsRequest>\n	<credentials\n	 personalAccessTokenName="{personalAccessTokenName}" personalAccessTokenSecret="{personalAccessTokenSecret}" >\n		<site contentUrl="{site_name}" />\n	</credentials>\n</tsRequest>"""
+        payload = f"""<tsRequest>	<credentials	 personalAccessTokenName="{personalAccessTokenName}" personalAccessTokenSecret="{personalAccessTokenSecret}" >		<site contentUrl="{site_name}" />	</credentials></tsRequest>"""
 
         response = requests.request("POST", endpoint, headers=headerList, data=payload)
 
