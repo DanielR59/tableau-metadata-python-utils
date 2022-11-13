@@ -3,7 +3,7 @@ import requests
 import xmltodict
 import tableauserverclient as TSC
 from .exceptions.errores import DatabaseNameNotFound, LoginError, SiteNameError
-
+from .xmlutils.utils import create_xml_login
 
 
 class myTableauApi:
@@ -29,21 +29,26 @@ class myTableauApi:
         self.__personalAccessTokenSecret = personalAccessTokenSecret
         self.site_name = site_name
 
-        self.temp_token = self.__login(
-            endpoint=self.endpoint,
-            personalAccessTokenName=self.__personalAccessTokenName,
-            personalAccessTokenSecret=self.__personalAccessTokenSecret,
-            site_name=self.site_name,
-        )
-
-        self.__tableau_auth = TSC.PersonalAccessTokenAuth(
-            token_name=personalAccessTokenName,
-            personal_access_token=personalAccessTokenSecret,
-            site_id=site_name,
-        )
+        if self.site_name == "default":
+            self.__tableau_auth = TSC.PersonalAccessTokenAuth(
+                token_name=personalAccessTokenName,
+                personal_access_token=personalAccessTokenSecret
+            )
+        else:
+            self.__tableau_auth = TSC.PersonalAccessTokenAuth(
+                token_name=personalAccessTokenName,
+                personal_access_token=personalAccessTokenSecret,
+                site_id=site_name,
+            )
         self.__server = TSC.Server(self.server_url, use_server_version=True)
 
         self.site_luid = self._getsite_luid(
+            site_name=self.site_name,
+        )
+        self.temp_token, self.site_id = self.__login(
+            endpoint=self.endpoint,
+            personalAccessTokenName=self.__personalAccessTokenName,
+            personalAccessTokenSecret=self.__personalAccessTokenSecret,
             site_name=self.site_name,
         )
 
@@ -67,13 +72,15 @@ class myTableauApi:
             "Content-Type": "application/xml",
         }
 
-        payload = f"""<tsRequest>	<credentials	 personalAccessTokenName="{personalAccessTokenName}" personalAccessTokenSecret="{personalAccessTokenSecret}" >		<site contentUrl="{site_name}" />	</credentials></tsRequest>"""
 
-        response = requests.request("POST", endpoint, headers=headerList, data=payload)
+        payload = create_xml_login(personalAccessTokenName,personalAccessTokenSecret, site_name)
+        # payload = f"""<tsRequest>	<credentials	 personalAccessTokenName="{personalAccessTokenName}" personalAccessTokenSecret="{personalAccessTokenSecret}" >		<site contentUrl="{site_name}" />	</credentials></tsRequest>"""
+
+        response = requests.request("POST", url=endpoint, headers=headerList, data=payload)
 
         if response.ok:
             respuesta = xmltodict.parse(response.text)
-            return respuesta["tsResponse"]["credentials"]["@token"]
+            return respuesta["tsResponse"]["credentials"]["@token"], respuesta["tsResponse"]["credentials"]["site"]["@id"]
 
         else:
             raise LoginError
@@ -291,3 +298,30 @@ class myTableauApi:
             )
 
             print(response.ok)
+
+    def get_flows(self, site_id : str = None):
+
+        headersList = {
+            "Accept": "*/*",
+            "X-Tableau-Auth": self.temp_token
+        }
+
+        payload = ""
+
+        if site_id:
+
+            # reqUrl = f"{self.endpoint}/sites/{self.site_luid}/flows/runs"
+            reqUrl = f"{self.endpoint}/sites/{site_id}/flows/runs"
+            response = requests.request(
+                "GET", url=reqUrl, data=payload, headers=headersList
+            )
+
+
+        else:
+            reqUrl = f"{self.endpoint}/sites/{self.site_id}/flows/runs"
+            response = requests.request(
+                "GET", url=reqUrl, data=payload, headers=headersList
+            )
+
+        if response.ok:
+            print(response.text)
